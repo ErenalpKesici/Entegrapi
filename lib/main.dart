@@ -39,12 +39,7 @@ class MyHomePage extends StatefulWidget {
 class _MyHomePageState extends State<MyHomePage> {
   late WebViewPlusController controller;
   int loadingPercentage = 0;
-  String mainTitle = '',
-      subtitle = '',
-      drawerLogo = '',
-      drawerLogoLink = '',
-      theme = '';
-  List drawerItems = List.empty(growable: true);
+  String mainTitle = '', subtitle = '', theme = '';
   @override
   void initState() {
     super.initState();
@@ -54,31 +49,6 @@ class _MyHomePageState extends State<MyHomePage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      drawer: theme == 'panel'
-          ? Drawer(
-              child: ListView(children: [
-                drawerLogo == ''
-                    ? Container()
-                    : DrawerHeader(
-                        child: ListTile(
-                          title: Image.network(drawerLogo),
-                          onTap: () {
-                            controller.loadUrl(drawerLogoLink);
-                          },
-                        ),
-                      ),
-                ListTile(
-                  onTap: () {},
-                  leading: Icon(Icons.abc),
-                  trailing: Text('asda'),
-                ),
-                ListTile(
-                  onTap: () {},
-                  leading: Icon(Icons.abc),
-                ),
-              ]),
-            )
-          : null,
       appBar: theme == 'login'
           ? AppBar(
               centerTitle: true,
@@ -178,23 +148,6 @@ class _MyHomePageState extends State<MyHomePage> {
               setState(() {
                 theme = 'panel';
               });
-              drawerLogoLink = await controller.webViewController
-                  .runJavascriptReturningResult(
-                      "document.getElementsByClassName('m-brand__logo-wrapper')[0].href");
-              drawerLogoLink = drawerLogoLink.replaceAll('"', '');
-              drawerLogo = await controller.webViewController
-                  .runJavascriptReturningResult(
-                      "document.getElementsByClassName('m-brand__logo-wrapper')[0].children[0].src");
-              drawerLogo = drawerLogo.replaceAll('"', '');
-
-              print(await controller.webViewController.runJavascriptReturningResult(
-                  "class Tile{} let ret = ''; const items = document.getElementsByClassName('m-menu__nav  m-menu__nav--dropdown-submenu-arrow ')[0].children; for(let i = 0; i<items.length; i++){if(items[i].children[0].tagName == 'A')ret+=(items[i].children[0].href); ret;}"));
-              setState(() {
-                drawerLogo;
-                drawerLogoLink;
-              });
-              controller.webViewController.runJavascript(
-                  "document.getElementById('m_header').style.display = 'none';");
             }
           },
           navigationDelegate: (NavigationRequest request) async {
