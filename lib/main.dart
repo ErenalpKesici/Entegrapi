@@ -66,21 +66,10 @@ class _MyHomePageState extends State<MyHomePage> {
                       preferredSize: Size.zero,
                     ),
             )
-          : theme == 'panel'
-              ? AppBar(
-                  actions: [
-                    IconButton(
-                        onPressed: () {
-                          controller.webViewController.runJavascript(
-                              "document.getElementsByClassName('btn m-btn--pill    btn-secondary m-btn m-btn--custom m-btn--label-brand m-btn--bolder')[0].click()");
-                        },
-                        icon: Icon(Icons.abc))
-                  ],
-                )
-              : PreferredSize(
-                  child: AppBar(),
-                  preferredSize: Size.fromHeight(
-                      MediaQuery.of(context).size.height * .001)),
+          : PreferredSize(
+              child: AppBar(),
+              preferredSize:
+                  Size.fromHeight(MediaQuery.of(context).size.height * .001)),
       body: WillPopScope(
         onWillPop: () async {
           controller.webViewController.goBack();
