@@ -11,7 +11,7 @@ import 'package:webview_flutter_plus/webview_flutter_plus.dart';
 import 'package:get/get.dart';
 
 String name = 'Entegrapi';
-String panelUrl = 'https://msglashing.com/admin';
+String panelUrl = 'https://panel.entegrapi.com/';
 String siteUrl = 'https://entegrapi.com';
 void main() {
   runApp(const MyApp());
