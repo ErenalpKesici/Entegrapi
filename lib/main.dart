@@ -8,10 +8,12 @@ import 'package:url_launcher/url_launcher.dart';
 import 'package:mailto/mailto.dart';
 import 'package:webview_flutter_plus/webview_flutter_plus.dart';
 import 'package:get/get.dart';
+import 'package:liquid_progress_indicator/liquid_progress_indicator.dart';
 
 String name = 'Entegrapi';
 String panelUrl = 'https://panel.entegrapi.com/';
 String siteUrl = 'https://entegrapi.com';
+bool _isLoading = true;
 void main() {
   runApp(const MyApp());
 }
@@ -70,97 +72,124 @@ class _MyHomePageState extends State<MyHomePage> {
               preferredSize:
                   Size.fromHeight(MediaQuery.of(context).size.height * .001)),
       body: WillPopScope(
-        onWillPop: () async {
-          controller.webViewController.goBack();
-          return false;
-        },
-        child: WebViewPlus(
-          // gestureRecognizers: Set()
-          //   ..add(Factory<VerticalDragGestureRecognizer>(
-          //       () => VerticalDragGestureRecognizer()
-          //         ..onDown = (DragDownDetails dragDownDetails) {
-          //           print(dragDownDetails.toString());
-          //           controller.webViewController.getScrollY().then((value) {
-          //             if (value == 0 &&
-          //                 dragDownDetails.globalPosition.direction < 1) {
-          //               controller.webViewController.reload();
-          //             }
-          //           });
-          //         }
-          //         ..onCancel = () {
-          //           print('e ');
-          //         })),
-          javascriptMode: JavascriptMode.unrestricted,
-          initialUrl: panelUrl,
-          onWebViewCreated: (WebViewPlusController controller) async {
-            this.controller = controller;
+          onWillPop: () async {
+            controller.webViewController.goBack();
+            return false;
           },
-          // javascriptChannels: Set.from([
-          //   JavascriptChannel(
-          //       name: 'Status',
-          //       onMessageReceived: (JavascriptMessage message) async {
-          //         String status = message.message;
-          //         await controller.webViewController.runJavascript(
-          //             '''var date = new Date();date.setTime(date.getTime()+(30*24*60*60*1000));document.cookie = "status=$status; expires=" + date.toGMTString();''');
-          //         print('mess: ' + status);
-          //       })
-          // ]),
-          onPageFinished: (String url) async {
-            String? title = await controller.webViewController.getTitle();
-            print(title);
-            if (title?.split(' - ').first == 'Sayfa Bulunamadı') {
-              ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Sayfa Bulunamadı')));
-              controller.webViewController
-                  .loadUrl(theme == 'panel' ? panelUrl : siteUrl);
-            } else if (title!.toLowerCase().endsWith('giriş')) {
-              setState(() {
-                theme = 'login';
-              });
-              mainTitle = await controller.webViewController
-                  .runJavascriptReturningResult(
-                      "document.getElementsByClassName('m-login__welcome')[0].textContent;");
-              subtitle = await controller.webViewController
-                  .runJavascriptReturningResult(
-                      "document.getElementsByClassName('m-login__msg')[0].innerText;");
-              mainTitle = mainTitle.replaceAll('"', '');
-              subtitle = subtitle.replaceAll('"', '');
-              setState(() {
-                mainTitle = mainTitle == 'null' ? '' : mainTitle;
-                subtitle = subtitle == 'null' ? '' : subtitle;
-                ;
-              });
-              controller.webViewController.runJavascript(
-                  "const elements = document.getElementsByClassName('m-login__content'); while (elements.length > 0) elements[0].remove();");
-            } else if (title.toLowerCase().endsWith('panel')) {
-              setState(() {
-                theme = 'panel';
-              });
-            }
-          },
-          navigationDelegate: (NavigationRequest request) async {
-            if (request.url.startsWith('tel')) {
-              await launch('tel:' + request.url.split(':').last);
-              return NavigationDecision.prevent;
-            } else if (request.url.startsWith('mailto')) {
-              final mailtoLink = Mailto(
-                to: [request.url.split(':').last],
-                subject: '',
-                body: '',
-              );
-              await launch('$mailtoLink');
-              return NavigationDecision.prevent;
-            } else if (request.url
-                .startsWith('https://api.whatsapp.com/send?phone')) {
-              if (await canLaunch(request.url)) {
-                launch(request.url);
-              }
-              return NavigationDecision.prevent;
-            }
-            return NavigationDecision.navigate;
-          },
-        ),
-      ),
+          child: Stack(
+            children: [
+              WebViewPlus(
+                // gestureRecognizers: Set()
+                //   ..add(Factory<VerticalDragGestureRecognizer>(
+                //       () => VerticalDragGestureRecognizer()
+                //         ..onDown = (DragDownDetails dragDownDetails) {
+                //           print(dragDownDetails.toString());
+                //           controller.webViewController.getScrollY().then((value) {
+                //             if (value == 0 &&
+                //                 dragDownDetails.globalPosition.direction < 1) {
+                //               controller.webViewController.reload();
+                //             }
+                //           });
+                //         }
+                //         ..onCancel = () {
+                //           print('e ');
+                //         })),
+                javascriptMode: JavascriptMode.unrestricted,
+                initialUrl: panelUrl,
+                onWebViewCreated: (WebViewPlusController controller) async {
+                  this.controller = controller;
+                },
+                // javascriptChannels: Set.from([
+                //   JavascriptChannel(
+                //       name: 'Status',
+                //       onMessageReceived: (JavascriptMessage message) async {
+                //         String status = message.message;
+                //         await controller.webViewController.runJavascript(
+                //             '''var date = new Date();date.setTime(date.getTime()+(30*24*60*60*1000));document.cookie = "status=$status; expires=" + date.toGMTString();''');
+                //         print('mess: ' + status);
+                //       })
+                // ]),
+                onPageStarted: (String url) {
+                  setState(() {
+                    _isLoading = true;
+                  });
+                },
+                onPageFinished: (String url) async {
+                  setState(() {
+                    _isLoading = false;
+                  });
+                  String? title = await controller.webViewController.getTitle();
+                  print(title);
+                  if (title?.split(' - ').first == 'Sayfa Bulunamadı') {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('Sayfa Bulunamadı')));
+                    controller.webViewController
+                        .loadUrl(theme == 'panel' ? panelUrl : siteUrl);
+                  } else if (title!.toLowerCase().endsWith('giriş')) {
+                    setState(() {
+                      theme = 'login';
+                    });
+                    mainTitle = await controller.webViewController
+                        .runJavascriptReturningResult(
+                            "document.getElementsByClassName('m-login__welcome')[0].textContent;");
+                    subtitle = await controller.webViewController
+                        .runJavascriptReturningResult(
+                            "document.getElementsByClassName('m-login__msg')[0].innerText;");
+                    mainTitle = mainTitle.replaceAll('"', '');
+                    subtitle = subtitle.replaceAll('"', '');
+                    setState(() {
+                      mainTitle = mainTitle == 'null' ? '' : mainTitle;
+                      subtitle = subtitle == 'null' ? '' : subtitle;
+                      ;
+                    });
+                    controller.webViewController.runJavascript(
+                        "const elements = document.getElementsByClassName('m-login__content'); while (elements.length > 0) elements[0].remove();");
+                  } else if (title.toLowerCase().endsWith('panel')) {
+                    setState(() {
+                      theme = 'panel';
+                    });
+                  }
+                },
+                navigationDelegate: (NavigationRequest request) async {
+                  if (request.url.startsWith('tel')) {
+                    await launch('tel:' + request.url.split(':').last);
+                    return NavigationDecision.prevent;
+                  } else if (request.url.startsWith('mailto')) {
+                    final mailtoLink = Mailto(
+                      to: [request.url.split(':').last],
+                      subject: '',
+                      body: '',
+                    );
+                    await launch('$mailtoLink');
+                    return NavigationDecision.prevent;
+                  } else if (request.url
+                      .startsWith('https://api.whatsapp.com/send?phone')) {
+                    if (await canLaunch(request.url)) {
+                      launch(request.url);
+                    }
+                    return NavigationDecision.prevent;
+                  }
+                  return NavigationDecision.navigate;
+                },
+              ),
+              _isLoading
+                  ? Stack(
+                      children: [
+                        Center(
+                          child: Image.asset(
+                            'assets/icon/icon.png',
+                            width: 20,
+                            fit: BoxFit.cover,
+                          ),
+                        ),
+                        Center(
+                          child: CircularProgressIndicator(),
+                        )
+                      ],
+                    )
+                  : Stack()
+            ],
+          )),
       floatingActionButton: Stack(
         children: [
           theme == 'site'
