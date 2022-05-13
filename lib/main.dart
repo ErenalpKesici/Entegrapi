@@ -8,7 +8,6 @@ import 'package:url_launcher/url_launcher.dart';
 import 'package:mailto/mailto.dart';
 import 'package:webview_flutter_plus/webview_flutter_plus.dart';
 import 'package:get/get.dart';
-import 'package:liquid_progress_indicator/liquid_progress_indicator.dart';
 
 String name = 'Entegrapi';
 String panelUrl = 'https://panel.entegrapi.com/';
