@@ -12,7 +12,7 @@ import 'package:get/get.dart';
 String name = 'Entegrapi';
 String panelUrl = 'https://panel.entegrapi.com/';
 String siteUrl = 'https://entegrapi.com';
-bool _isLoading = true;
+bool _isLoading = true, _error = false;
 void main() {
   runApp(const MyApp());
 }
@@ -40,10 +40,11 @@ class _MyHomePageState extends State<MyHomePage> {
   late WebViewPlusController controller;
   int loadingPercentage = 0;
   String mainTitle = '', subtitle = '', theme = '';
-  @override
-  void initState() {
-    super.initState();
-    if (Platform.isAndroid) WebViewPlus.platform = SurfaceAndroidWebView();
+  Future<void> _retry() async {
+    await Future.delayed(Duration(seconds: 5));
+    setState(() {
+      _error = false;
+    });
   }
 
   @override
@@ -77,100 +78,103 @@ class _MyHomePageState extends State<MyHomePage> {
           },
           child: Stack(
             children: [
-              WebViewPlus(
-                // gestureRecognizers: Set()
-                //   ..add(Factory<VerticalDragGestureRecognizer>(
-                //       () => VerticalDragGestureRecognizer()
-                //         ..onDown = (DragDownDetails dragDownDetails) {
-                //           print(dragDownDetails.toString());
-                //           controller.webViewController.getScrollY().then((value) {
-                //             if (value == 0 &&
-                //                 dragDownDetails.globalPosition.direction < 1) {
-                //               controller.webViewController.reload();
-                //             }
-                //           });
-                //         }
-                //         ..onCancel = () {
-                //           print('e ');
-                //         })),
-                javascriptMode: JavascriptMode.unrestricted,
-                initialUrl: panelUrl,
-                onWebViewCreated: (WebViewPlusController controller) async {
-                  this.controller = controller;
-                },
-                // javascriptChannels: Set.from([
-                //   JavascriptChannel(
-                //       name: 'Status',
-                //       onMessageReceived: (JavascriptMessage message) async {
-                //         String status = message.message;
-                //         await controller.webViewController.runJavascript(
-                //             '''var date = new Date();date.setTime(date.getTime()+(30*24*60*60*1000));document.cookie = "status=$status; expires=" + date.toGMTString();''');
-                //         print('mess: ' + status);
-                //       })
-                // ]),
-                onPageStarted: (String url) {
-                  setState(() {
-                    _isLoading = true;
-                  });
-                },
-                onPageFinished: (String url) async {
-                  setState(() {
-                    _isLoading = false;
-                  });
-                  String? title = await controller.webViewController.getTitle();
-                  print(title);
-                  if (title?.split(' - ').first == 'Sayfa Bulunamadı') {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('Sayfa Bulunamadı')));
-                    controller.webViewController
-                        .loadUrl(theme == 'panel' ? panelUrl : siteUrl);
-                  } else if (title!.toLowerCase().endsWith('giriş')) {
-                    setState(() {
-                      theme = 'login';
-                    });
-                    mainTitle = await controller.webViewController
-                        .runJavascriptReturningResult(
-                            "document.getElementsByClassName('m-login__welcome')[0].textContent;");
-                    subtitle = await controller.webViewController
-                        .runJavascriptReturningResult(
-                            "document.getElementsByClassName('m-login__msg')[0].innerText;");
-                    mainTitle = mainTitle.replaceAll('"', '');
-                    subtitle = subtitle.replaceAll('"', '');
-                    setState(() {
-                      mainTitle = mainTitle == 'null' ? '' : mainTitle;
-                      subtitle = subtitle == 'null' ? '' : subtitle;
-                      ;
-                    });
-                    controller.webViewController.runJavascript(
-                        "const elements = document.getElementsByClassName('m-login__content'); while (elements.length > 0) elements[0].remove();");
-                  } else if (title.toLowerCase().endsWith('panel')) {
-                    setState(() {
-                      theme = 'panel';
-                    });
-                  }
-                },
-                navigationDelegate: (NavigationRequest request) async {
-                  if (request.url.startsWith('tel')) {
-                    await launch('tel:' + request.url.split(':').last);
-                    return NavigationDecision.prevent;
-                  } else if (request.url.startsWith('mailto')) {
-                    final mailtoLink = Mailto(
-                      to: [request.url.split(':').last],
-                      subject: '',
-                      body: '',
-                    );
-                    await launch('$mailtoLink');
-                    return NavigationDecision.prevent;
-                  } else if (request.url
-                      .startsWith('https://api.whatsapp.com/send?phone')) {
-                    if (await canLaunch(request.url)) {
-                      launch(request.url);
-                    }
-                    return NavigationDecision.prevent;
-                  }
-                  return NavigationDecision.navigate;
-                },
-              ),
+              _error == false
+                  ? WebViewPlus(
+                      javascriptMode: JavascriptMode.unrestricted,
+                      initialUrl: panelUrl,
+                      onWebViewCreated:
+                          (WebViewPlusController controller) async {
+                        this.controller = controller;
+                      },
+                      onPageStarted: (String url) {
+                        setState(() {
+                          _isLoading = true;
+                        });
+                      },
+                      onWebResourceError: (WebResourceError err) {
+                        setState(() {
+                          _error = true;
+                        });
+                      },
+                      onPageFinished: (String url) async {
+                        setState(() {
+                          _isLoading = false;
+                        });
+                        if (_error) return;
+                        String? title =
+                            await controller.webViewController.getTitle();
+                        if (title?.split(' - ').first == 'Sayfa Bulunamadı') {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                  content: Text('Sayfa Bulunamadı')));
+                          controller.webViewController
+                              .loadUrl(theme == 'panel' ? panelUrl : siteUrl);
+                        } else if (title!.toLowerCase().endsWith('giriş')) {
+                          setState(() {
+                            theme = 'login';
+                          });
+                          mainTitle = await controller.webViewController
+                              .runJavascriptReturningResult(
+                                  "document.getElementsByClassName('m-login__welcome')[0].textContent;");
+                          subtitle = await controller.webViewController
+                              .runJavascriptReturningResult(
+                                  "document.getElementsByClassName('m-login__msg')[0].innerText;");
+                          mainTitle = mainTitle.replaceAll('"', '');
+                          subtitle = subtitle.replaceAll('"', '');
+                          setState(() {
+                            mainTitle = mainTitle == 'null' ? '' : mainTitle;
+                            subtitle = subtitle == 'null' ? '' : subtitle;
+                            ;
+                          });
+                          controller.webViewController.runJavascript(
+                              "const elements = document.getElementsByClassName('m-login__content'); while (elements.length > 0) elements[0].remove();");
+                        } else if (title.toLowerCase().endsWith('panel')) {
+                          setState(() {
+                            theme = 'panel';
+                          });
+                        }
+                      },
+                      navigationDelegate: (NavigationRequest request) async {
+                        if (request.url.startsWith('tel')) {
+                          await launch('tel:' + request.url.split(':').last);
+                          return NavigationDecision.prevent;
+                        } else if (request.url.startsWith('mailto')) {
+                          final mailtoLink = Mailto(
+                            to: [request.url.split(':').last],
+                            subject: '',
+                            body: '',
+                          );
+                          await launch('$mailtoLink');
+                          return NavigationDecision.prevent;
+                        } else if (request.url.startsWith(
+                            'https://api.whatsapp.com/send?phone')) {
+                          if (await canLaunch(request.url)) {
+                            launch(request.url);
+                          }
+                          return NavigationDecision.prevent;
+                        }
+                        return NavigationDecision.navigate;
+                      },
+                    )
+                  : Center(
+                      child: FutureBuilder(
+                        future: _retry(),
+                        builder: (BuildContext context,
+                            AsyncSnapshot<dynamic> snapshot) {
+                          return Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              CircularProgressIndicator(),
+                              Padding(
+                                padding: const EdgeInsets.all(8.0),
+                                child: Text(
+                                    'Bağlantı hatası, yeniden deneniyor...'),
+                              )
+                            ],
+                          );
+                        },
+                      ),
+                    ),
               _isLoading
                   ? Stack(
                       children: [
@@ -189,65 +193,53 @@ class _MyHomePageState extends State<MyHomePage> {
                   : Stack()
             ],
           )),
-      floatingActionButton: Stack(
-        children: [
-          theme == 'site'
-              ? Align(
-                  alignment: Alignment.bottomLeft,
-                  child: Padding(
-                    padding: EdgeInsets.fromLTRB(
-                        MediaQuery.of(context).size.width * .1, 0, 0, 0),
-                    child: FloatingActionButton.extended(
-                        tooltip: 'Giriş Yap',
-                        onPressed: () async {
-                          if (controller.webViewController.currentUrl() !=
-                              panelUrl)
-                            await controller.webViewController
-                                .loadUrl(panelUrl);
-                          setState(() {
-                            theme = 'login';
-                          });
-                          Get.changeTheme(
-                              ThemeData(primarySwatch: Colors.purple));
-                        },
-                        label: Text('Panele Giriş Yap'),
-                        icon: const Icon(Icons.login)),
-                  ),
-                )
-              : Container(),
-          theme == 'login'
-              ? Align(
-                  alignment: Alignment.bottomRight,
-                  child: FloatingActionButton.extended(
-                    tooltip: 'İncele',
-                    onPressed: () {
-                      controller.webViewController.loadUrl(siteUrl);
-                      setState(() {
-                        theme = 'site';
-                      });
-                      Get.changeTheme(ThemeData(primarySwatch: Colors.red));
-                    },
-                    label: Text('İncele'),
-                    icon: const Icon(Icons.explore),
-                  ))
-              : Container()
-        ],
-      ),
-      // bottomNavigationBar: theme == 'panel'
-      //     ? BottomNavigationBar(
-      //         onTap: (int idx) {
-      //           if (idx == 1) {
-      //             controller.webViewController.runJavascript(
-      //                 "document.getElementsByClassName('m-nav__link m-dropdown__toggle')[1].click();");
-      //           }
-      //         },
-      //         items: [
-      //             BottomNavigationBarItem(
-      //                 icon: Icon(Icons.r_mobiledata_outlined), label: 'asd'),
-      //             BottomNavigationBarItem(
-      //                 icon: Icon(Icons.account_circle), label: 'Hesap')
-      //           ])
-      //     : null,
+      floatingActionButton: _error == false
+          ? Stack(
+              children: [
+                theme == 'site'
+                    ? Align(
+                        alignment: Alignment.bottomLeft,
+                        child: Padding(
+                          padding: EdgeInsets.fromLTRB(
+                              MediaQuery.of(context).size.width * .1, 0, 0, 0),
+                          child: FloatingActionButton.extended(
+                              tooltip: 'Giriş Yap',
+                              onPressed: () async {
+                                if (controller.webViewController.currentUrl() !=
+                                    panelUrl)
+                                  await controller.webViewController
+                                      .loadUrl(panelUrl);
+                                setState(() {
+                                  theme = 'login';
+                                });
+                                Get.changeTheme(
+                                    ThemeData(primarySwatch: Colors.purple));
+                              },
+                              label: Text('Panele Giriş Yap'),
+                              icon: const Icon(Icons.login)),
+                        ),
+                      )
+                    : Container(),
+                theme == 'login'
+                    ? Align(
+                        alignment: Alignment.bottomRight,
+                        child: FloatingActionButton.extended(
+                          tooltip: 'İncele',
+                          onPressed: () {
+                            controller.webViewController.loadUrl(siteUrl);
+                            setState(() {
+                              theme = 'site';
+                            });
+                            Get.changeTheme(
+                                ThemeData(primarySwatch: Colors.red));
+                          },
+                          label: Text('İncele'),
+                          icon: const Icon(Icons.explore),
+                        ))
+                    : Container()
+              ],
+            )
+          : null,
     );
   }
 }
