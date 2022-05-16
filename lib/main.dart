@@ -7,13 +7,18 @@ import 'dart:io';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:mailto/mailto.dart';
 import 'package:webview_flutter_plus/webview_flutter_plus.dart';
-import 'package:get/get.dart';
+import 'package:cached_network_image/cached_network_image.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 String name = 'Entegrapi';
 String panelUrl = 'https://panel.entegrapi.com/';
 String siteUrl = 'https://entegrapi.com';
+String _panelImage = '';
 bool _isLoading = true, _error = false;
-void main() {
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  final prefs = await SharedPreferences.getInstance();
+  _panelImage = prefs.getString('panelImage') ?? '';
   runApp(const MyApp());
 }
 
@@ -21,10 +26,10 @@ class MyApp extends StatelessWidget {
   const MyApp({Key? key}) : super(key: key);
   @override
   Widget build(BuildContext context) {
-    return GetMaterialApp(
+    return MaterialApp(
       debugShowCheckedModeBanner: false,
       home: MyHomePage(),
-      theme: ThemeData(primarySwatch: Colors.purple),
+      theme: ThemeData(primarySwatch: Colors.deepPurple),
     );
   }
 }
@@ -47,11 +52,24 @@ class _MyHomePageState extends State<MyHomePage> {
     });
   }
 
+  Image? _getImage() {
+    return _panelImage == ''
+        ? null
+        : Image(
+            image: CachedNetworkImageProvider(
+              _panelImage,
+            ),
+            fit: BoxFit.cover,
+          );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: theme == 'login'
           ? AppBar(
+              flexibleSpace: _getImage(),
+              backgroundColor: Colors.transparent,
               centerTitle: true,
               title: mainTitle == '' ? null : Text(mainTitle),
               bottom: subtitle == ''
@@ -68,7 +86,10 @@ class _MyHomePageState extends State<MyHomePage> {
                     ),
             )
           : PreferredSize(
-              child: AppBar(),
+              child: AppBar(
+                flexibleSpace: _getImage(),
+                backgroundColor: Colors.transparent,
+              ),
               preferredSize:
                   Size.fromHeight(MediaQuery.of(context).size.height * .001)),
       body: WillPopScope(
@@ -119,13 +140,26 @@ class _MyHomePageState extends State<MyHomePage> {
                           subtitle = await controller.webViewController
                               .runJavascriptReturningResult(
                                   "document.getElementsByClassName('m-login__msg')[0].innerText;");
-                          mainTitle = mainTitle.replaceAll('"', '');
-                          subtitle = subtitle.replaceAll('"', '');
+                          _panelImage = await controller.webViewController
+                              .runJavascriptReturningResult(
+                                  "document.getElementsByClassName('m-grid__item m-grid__item--fluid m-grid m-grid--center m-grid--hor m-grid__item--order-tablet-and-mobile-1	m-login__content m-grid-item--center')[0].style.backgroundImage");
                           setState(() {
-                            mainTitle = mainTitle == 'null' ? '' : mainTitle;
-                            subtitle = subtitle == 'null' ? '' : subtitle;
-                            ;
+                            mainTitle = mainTitle == 'null'
+                                ? ''
+                                : mainTitle.replaceAll('"', '');
+                            subtitle = subtitle == 'null'
+                                ? ''
+                                : subtitle.replaceAll('"', '');
+                            _panelImage = _panelImage == 'null'
+                                ? ''
+                                : _panelImage
+                                    .split('"')[2]
+                                    .replaceAll("\\", '');
                           });
+                          if (_panelImage != '') {
+                            final prefs = await SharedPreferences.getInstance();
+                            prefs.setString('panelImage', _panelImage);
+                          }
                           controller.webViewController.runJavascript(
                               "const elements = document.getElementsByClassName('m-login__content'); while (elements.length > 0) elements[0].remove();");
                         } else if (title.toLowerCase().endsWith('panel')) {
@@ -193,52 +227,33 @@ class _MyHomePageState extends State<MyHomePage> {
                   : Stack()
             ],
           )),
-      floatingActionButton: _error == false
-          ? Stack(
-              children: [
-                theme == 'site'
-                    ? Align(
-                        alignment: Alignment.bottomLeft,
-                        child: Padding(
-                          padding: EdgeInsets.fromLTRB(
-                              MediaQuery.of(context).size.width * .1, 0, 0, 0),
-                          child: FloatingActionButton.extended(
-                              tooltip: 'Giriş Yap',
-                              onPressed: () async {
-                                if (controller.webViewController.currentUrl() !=
-                                    panelUrl)
-                                  await controller.webViewController
-                                      .loadUrl(panelUrl);
-                                setState(() {
-                                  theme = 'login';
-                                });
-                                Get.changeTheme(
-                                    ThemeData(primarySwatch: Colors.purple));
-                              },
-                              label: Text('Panele Giriş Yap'),
-                              icon: const Icon(Icons.login)),
-                        ),
-                      )
-                    : Container(),
-                theme == 'login'
-                    ? Align(
-                        alignment: Alignment.bottomRight,
-                        child: FloatingActionButton.extended(
-                          tooltip: 'İncele',
-                          onPressed: () {
-                            controller.webViewController.loadUrl(siteUrl);
-                            setState(() {
-                              theme = 'site';
-                            });
-                            Get.changeTheme(
-                                ThemeData(primarySwatch: Colors.red));
-                          },
-                          label: Text('İncele'),
-                          icon: const Icon(Icons.explore),
-                        ))
-                    : Container()
-              ],
-            )
+      floatingActionButtonLocation: FloatingActionButtonLocation.startFloat,
+      floatingActionButton: _error == false && _isLoading == false
+          ? (theme == 'site'
+              ? FloatingActionButton.extended(
+                  tooltip: 'Giriş Yap',
+                  onPressed: () async {
+                    if (controller.webViewController.currentUrl() != panelUrl)
+                      await controller.webViewController.loadUrl(panelUrl);
+                    setState(() {
+                      theme = 'login';
+                    });
+                  },
+                  label: Text('Panele Giriş Yap'),
+                  icon: const Icon(Icons.login))
+              : theme == 'login'
+                  ? FloatingActionButton.extended(
+                      tooltip: 'İncele',
+                      onPressed: () {
+                        controller.webViewController.loadUrl(siteUrl);
+                        setState(() {
+                          theme = 'site';
+                        });
+                      },
+                      label: Text('İncele'),
+                      icon: const Icon(Icons.explore),
+                    )
+                  : null)
           : null,
     );
   }
