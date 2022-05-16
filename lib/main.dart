@@ -150,11 +150,17 @@ class _MyHomePageState extends State<MyHomePage> {
                             subtitle = subtitle == 'null'
                                 ? ''
                                 : subtitle.replaceAll('"', '');
+                            print(_panelImage);
                             _panelImage = _panelImage == 'null'
                                 ? ''
                                 : _panelImage
-                                    .split('"')[2]
+                                    .replaceAll('"', '')
+                                    .split(
+                                      '(',
+                                    )[1]
+                                    .split(')')[0]
                                     .replaceAll("\\", '');
+                            print(_panelImage);
                           });
                           if (_panelImage != '') {
                             final prefs = await SharedPreferences.getInstance();
