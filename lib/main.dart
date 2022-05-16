@@ -150,7 +150,6 @@ class _MyHomePageState extends State<MyHomePage> {
                             subtitle = subtitle == 'null'
                                 ? ''
                                 : subtitle.replaceAll('"', '');
-                            print(_panelImage);
                             _panelImage = _panelImage == 'null'
                                 ? ''
                                 : _panelImage
@@ -160,7 +159,6 @@ class _MyHomePageState extends State<MyHomePage> {
                                     )[1]
                                     .split(')')[0]
                                     .replaceAll("\\", '');
-                            print(_panelImage);
                           });
                           if (_panelImage != '') {
                             final prefs = await SharedPreferences.getInstance();
@@ -233,34 +231,6 @@ class _MyHomePageState extends State<MyHomePage> {
                   : Stack()
             ],
           )),
-      floatingActionButtonLocation: FloatingActionButtonLocation.startFloat,
-      floatingActionButton: _error == false && _isLoading == false
-          ? (theme == 'site'
-              ? FloatingActionButton.extended(
-                  tooltip: 'Giriş Yap',
-                  onPressed: () async {
-                    if (controller.webViewController.currentUrl() != panelUrl)
-                      await controller.webViewController.loadUrl(panelUrl);
-                    setState(() {
-                      theme = 'login';
-                    });
-                  },
-                  label: Text('Panele Giriş Yap'),
-                  icon: const Icon(Icons.login))
-              : theme == 'login'
-                  ? FloatingActionButton.extended(
-                      tooltip: 'İncele',
-                      onPressed: () {
-                        controller.webViewController.loadUrl(siteUrl);
-                        setState(() {
-                          theme = 'site';
-                        });
-                      },
-                      label: Text('İncele'),
-                      icon: const Icon(Icons.explore),
-                    )
-                  : null)
-          : null,
     );
   }
 }
