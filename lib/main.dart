@@ -1,18 +1,18 @@
 import 'dart:async';
 import 'package:flutter/cupertino.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'dart:io';
-// import 'package:webview_flutter/webview_flutter.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:mailto/mailto.dart';
-import 'package:webview_flutter_plus/webview_flutter_plus.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:flutter_inappwebview/flutter_inappwebview.dart';
 
 String name = 'Entegrapi';
-String panelUrl = 'https://panel.entegrapi.com/';
-String siteUrl = 'https://entegrapi.com';
+String panelUrl = '';
+String siteUrl = 'https://panel.entegrapi.com/entegrapi';
 String _panelImage = '';
 bool _isLoading = true, _error = false;
 void main() async {
@@ -42,14 +42,31 @@ class MyHomePage extends StatefulWidget {
 }
 
 class _MyHomePageState extends State<MyHomePage> {
-  late WebViewPlusController controller;
-  int loadingPercentage = 0;
+  late InAppWebViewController controller;
   String mainTitle = '', subtitle = '', theme = '';
+  late PullToRefreshController pullToRefreshController;
+
+  final GlobalKey webViewKey = GlobalKey();
   Future<void> _retry() async {
     await Future.delayed(Duration(seconds: 5));
     setState(() {
       _error = false;
     });
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    pullToRefreshController = PullToRefreshController(
+      onRefresh: () async {
+        if (Platform.isAndroid) {
+          controller.reload();
+        } else if (Platform.isIOS) {
+          controller.loadUrl(
+              urlRequest: URLRequest(url: await controller.getUrl()));
+        }
+      },
+    );
   }
 
   Image? _getImage() {
@@ -94,54 +111,69 @@ class _MyHomePageState extends State<MyHomePage> {
                   Size.fromHeight(MediaQuery.of(context).size.height * .001)),
       body: WillPopScope(
           onWillPop: () async {
-            controller.webViewController.goBack();
+            controller.goBack();
             return false;
           },
           child: Stack(
             children: [
               _error == false
-                  ? WebViewPlus(
-                      javascriptMode: JavascriptMode.unrestricted,
-                      initialUrl: panelUrl,
+                  ? InAppWebView(
+                      key: webViewKey,
+                      initialOptions: InAppWebViewGroupOptions(
+                          android: AndroidInAppWebViewOptions(
+                              useHybridComposition: true),
+                          crossPlatform: InAppWebViewOptions(
+                              useOnLoadResource: true,
+                              useShouldOverrideUrlLoading: true)),
+                      initialUrlRequest: URLRequest(
+                          url: Uri.parse('https://panel.entegrapi.com/')),
+                      pullToRefreshController: pullToRefreshController,
                       onWebViewCreated:
-                          (WebViewPlusController controller) async {
+                          (InAppWebViewController controller) async {
                         this.controller = controller;
                       },
-                      onPageStarted: (String url) {
+                      onLoadStart: (controller, url) async {
                         setState(() {
                           _isLoading = true;
                         });
                       },
-                      onWebResourceError: (WebResourceError err) {
+                      onLoadError: (controller, uri, int, string) {
                         setState(() {
                           _error = true;
                         });
+                        pullToRefreshController.endRefreshing();
                       },
-                      onPageFinished: (String url) async {
+                      onLoadStop: (controller, url) async {
                         setState(() {
                           _isLoading = false;
                         });
+                        pullToRefreshController.endRefreshing();
                         if (_error) return;
-                        String? title =
-                            await controller.webViewController.getTitle();
+                        String? title = await controller.getTitle();
+                        print(title);
                         if (title?.split(' - ').first == 'Sayfa Bulunamadı') {
                           ScaffoldMessenger.of(context).showSnackBar(
                               const SnackBar(
                                   content: Text('Sayfa Bulunamadı')));
-                          controller.webViewController
-                              .loadUrl(theme == 'panel' ? panelUrl : siteUrl);
+                          controller.loadUrl(
+                              urlRequest: URLRequest(
+                                  url: Uri(
+                                      host: theme == 'panel'
+                                          ? panelUrl
+                                          : siteUrl)));
                         } else if (title!.toLowerCase().endsWith('giriş')) {
                           setState(() {
                             theme = 'login';
                           });
-                          mainTitle = await controller.webViewController
-                              .runJavascriptReturningResult(
+                          print(panelUrl);
+                          mainTitle = await controller.evaluateJavascript(
+                              source:
                                   "document.getElementsByClassName('m-login__welcome')[0].textContent;");
-                          subtitle = await controller.webViewController
-                              .runJavascriptReturningResult(
+                          subtitle = await controller.evaluateJavascript(
+                              source:
                                   "document.getElementsByClassName('m-login__msg')[0].innerText;");
-                          _panelImage = await controller.webViewController
-                              .runJavascriptReturningResult(
+                          _panelImage = await controller.evaluateJavascript(
+                              source:
                                   "document.getElementsByClassName('m-grid__item m-grid__item--fluid m-grid m-grid--center m-grid--hor m-grid__item--order-tablet-and-mobile-1	m-login__content m-grid-item--center')[0].style.backgroundImage");
                           setState(() {
                             mainTitle = mainTitle == 'null'
@@ -164,36 +196,61 @@ class _MyHomePageState extends State<MyHomePage> {
                             final prefs = await SharedPreferences.getInstance();
                             prefs.setString('panelImage', _panelImage);
                           }
-                          controller.webViewController.runJavascript(
-                              "const elements = document.getElementsByClassName('m-login__content'); while (elements.length > 0) elements[0].remove();");
+                          controller.evaluateJavascript(
+                              source:
+                                  "const elements = document.getElementsByClassName('m-login__content'); while (elements.length > 0) elements[0].remove();");
                         } else if (title.toLowerCase().endsWith('panel')) {
                           setState(() {
                             theme = 'panel';
                           });
                         }
                       },
-                      navigationDelegate: (NavigationRequest request) async {
-                        if (request.url.startsWith('tel')) {
-                          await launch('tel:' + request.url.split(':').last);
-                          return NavigationDecision.prevent;
-                        } else if (request.url.startsWith('mailto')) {
-                          final mailtoLink = Mailto(
-                            to: [request.url.split(':').last],
-                            subject: '',
-                            body: '',
-                          );
-                          await launch('$mailtoLink');
-                          return NavigationDecision.prevent;
-                        } else if (request.url.startsWith(
-                            'https://api.whatsapp.com/send?phone')) {
-                          if (await canLaunch(request.url)) {
-                            launch(request.url);
+                      shouldOverrideUrlLoading:
+                          (controller, navigationAction) async {
+                        if (navigationAction.request.url != null) {
+                          if (!navigationAction.request.url!
+                              .toString()
+                              .startsWith('https://panel.entegrapi.com')) {
+                            await launchUrl(navigationAction.request.url!);
+                            return NavigationActionPolicy.CANCEL;
                           }
-                          return NavigationDecision.prevent;
+                          if (navigationAction.request.url!
+                              .toString()
+                              .startsWith('tel')) {
+                            await launch('tel:' +
+                                navigationAction.request.url!
+                                    .toString()
+                                    .split(':')
+                                    .last);
+                            return NavigationActionPolicy.CANCEL;
+                          } else if (navigationAction.request.url!
+                              .toString()
+                              .startsWith('mailto')) {
+                            final mailtoLink = Mailto(
+                              to: [
+                                navigationAction.request.url!
+                                    .toString()
+                                    .split(':')
+                                    .last
+                              ],
+                              subject: '',
+                              body: '',
+                            );
+                            await launch('$mailtoLink');
+                            return NavigationActionPolicy.CANCEL;
+                          } else if (navigationAction.request.url!
+                              .toString()
+                              .startsWith(
+                                  'https://api.whatsapp.com/send?phone')) {
+                            if (await canLaunch(
+                                navigationAction.request.url!.toString())) {
+                              launch(navigationAction.request.url!.toString());
+                            }
+                            return NavigationActionPolicy.CANCEL;
+                          }
+                          return NavigationActionPolicy.ALLOW;
                         }
-                        return NavigationDecision.navigate;
-                      },
-                    )
+                      })
                   : Center(
                       child: FutureBuilder(
                         future: _retry(),
