@@ -17,6 +17,7 @@ String name = 'Entegrapi';
 String panelUrl = '';
 String siteUrl = 'https://panel.entegrapi.com/';
 String _panelImage = '';
+String currTitle = '';
 bool _loading = true, _error = false;
 
 void main() async {
@@ -58,7 +59,6 @@ void main() async {
     // Will be called whenever then user's email subscription changes
     // (ie. OneSignal.setEmail(email) is called and the user gets registered
   });
-
   runApp(const MyApp());
 }
 
@@ -195,18 +195,17 @@ class _MyHomePageState extends State<MyHomePage> {
                             pullToRefreshController.endRefreshing();
                             if (_error) return;
                             String? title = await controller.getTitle();
-                            if (title?.split(' - ').first ==
+                            if (title == currTitle) return;
+                            currTitle = title!;
+                            if (title.split(' - ').first ==
                                 'Sayfa Bulunamadı') {
                               ScaffoldMessenger.of(context).showSnackBar(
                                   const SnackBar(
                                       content: Text('Sayfa Bulunamadı')));
                               controller.loadUrl(
-                                  urlRequest: URLRequest(
-                                      url: Uri(
-                                          host: theme == 'panel'
-                                              ? panelUrl
-                                              : siteUrl)));
-                            } else if (title!.toLowerCase().endsWith('giriş')) {
+                                  urlRequest:
+                                      URLRequest(url: Uri.parse(panelUrl)));
+                            } else if (title.toLowerCase().endsWith('giriş')) {
                               setState(() {
                                 theme = 'login';
                               });
@@ -218,7 +217,7 @@ class _MyHomePageState extends State<MyHomePage> {
                                       "document.getElementsByClassName('m-login__msg')[0].innerText;");
                               _panelImage = await controller.evaluateJavascript(
                                   source:
-                                      "document.getElementsByClassName('m-grid__item m-grid__item--fluid m-grid m-grid--center m-grid--hor m-grid__item--order-tablet-and-mobile-1	m-login__content m-grid-item--center')[0].style.backgroundImage");
+                                      "document.getElementsByClassName('m-grid__item m-grid__item--fluid m-grid m-grid--center m-grid--hor m-grid__item--order-tablet-and-mobile-2	m-login__content m-grid-item--center')[0].style.backgroundImage");
                               setState(() {
                                 mainTitle = mainTitle == 'null'
                                     ? ''
